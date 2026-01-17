@@ -146,11 +146,11 @@ def apply_mobile_layout(fig, title_text, y_title, y_is_percent=True):
     """
     fig.update_layout(
         title=dict(text=title_text, font=dict(size=16), x=0.5, xanchor="center"),
-        margin=dict(l=60, r=20, t=55, b=90),  # bottom margin to avoid overlap
+        margin=dict(l=60, r=20, t=55, b=90),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.30,           # push legend below plot area
+            y=-0.30,
             xanchor="center",
             x=0.5,
             font=dict(size=11)
@@ -190,7 +190,27 @@ def stacked_area(x, series_dict, title, ytitle, danger_regions=None):
             x=x, y=y, mode="lines", stackgroup="one", name=name
         ))
 
-    # Danger shading (optional)
+    if danger_regions:
+        for (x0, x1) in danger_regions:
+            fig.add_vrect(
+                x0=x0, x1=x1,
+                fillcolor="rgba(255,0,0,0.12)",
+                line_width=0,
+                layer="below"
+            )
+
+    apply_mobile_layout(fig, title, ytitle, y_is_percent=True)
+    return fig
+
+
+def percent_lines(x, series_dict, title, ytitle, danger_regions=None):
+    """
+    Each species as a % line (NOT stacked). y-axis fixed to 0–100%.
+    """
+    fig = go.Figure()
+    for name, y in series_dict.items():
+        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name))
+
     if danger_regions:
         for (x0, x1) in danger_regions:
             fig.add_vrect(
@@ -242,7 +262,6 @@ for Tc in T_C:
     nH2O = S_C * xCH4
     comp = {"CH4": nCH4, "CO2": nCO2, "H2O": nH2O}
 
-    # Equilibrium in gas phase at TP (Gibbs minimization)
     gas.TPX = T, P_bar * 1e5, comp  # Pa
     gas.equilibrate("TP")
 
@@ -264,7 +283,7 @@ for Tc in T_C:
 danger_regions = find_regions(T_C, flag)
 show_warn = any(flag)
 
-# --- Top: Dry/Wet composition curves ---
+# --- Top: Dry/Wet composition curves (UNCHANGED: stacked area) ---
 colA, colB = st.columns([1, 1], gap="large")
 
 with colA:
@@ -308,34 +327,33 @@ apply_mobile_layout(
     y_is_percent=False
 )
 
-# For margin plot: keep x ticks clean
 fig3.update_layout(margin=dict(l=60, r=20, t=55, b=85))
 fig3.update_xaxes(tickmode="linear", tick0=400, dtick=100)
 
 st.plotly_chart(fig3, use_container_width=True)
 
 # -----------------------------
-# NEW: After margin -> add two more composition CURVE graphs (fixed 0–100%)
+# After margin: ONLY these two graphs are changed to % LINE curves (NOT stacked)
 # -----------------------------
-st.subheader("Gas composition curves (fixed to 100%) — re-shown after carbon margin")
+st.subheader("Gas composition curves (each species as % line)")
 
 colC, colD = st.columns([1, 1], gap="large")
 
 with colC:
-    fig4 = stacked_area(
+    fig4 = percent_lines(
         T_C,
         {"H2": dry["H2"], "CO": dry["CO"], "CO2": dry["CO2"], "CH4": dry["CH4"]},
-        "Dry gas composition (H2/CO/CO2/CH4, 0–100% fixed)",
+        "Dry gas composition (each species %, 0–100% fixed)",
         "Dry composition (%)",
         danger_regions
     )
     st.plotly_chart(fig4, use_container_width=True)
 
 with colD:
-    fig5 = stacked_area(
+    fig5 = percent_lines(
         T_C,
         {"H2O": wet["H2O"], "H2": wet["H2"], "CO": wet["CO"], "CO2": wet["CO2"], "CH4": wet["CH4"]},
-        "Wet gas composition (incl. H2O, 0–100% fixed)",
+        "Wet gas composition (each species %, 0–100% fixed)",
         "Wet composition (%)",
         danger_regions
     )
