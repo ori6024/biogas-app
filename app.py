@@ -1,4 +1,3 @@
- 
 import numpy as np
 import streamlit as st
 import cantera as ct
@@ -147,7 +146,7 @@ def apply_mobile_layout(fig, title_text, y_title, y_is_percent=True):
     """
     fig.update_layout(
         title=dict(text=title_text, font=dict(size=16), x=0.5, xanchor="center"),
-        margin=dict(l=60, r=20, t=55, b=90),  # bottom margin big to avoid overlap with legend/xlabel
+        margin=dict(l=60, r=20, t=55, b=90),  # bottom margin to avoid overlap
         legend=dict(
             orientation="h",
             yanchor="top",
@@ -184,22 +183,22 @@ def apply_mobile_layout(fig, title_text, y_title, y_is_percent=True):
     return fig
 
 
-def stacked_area(x, series_dict, title, ytitle, danger_regions):
+def stacked_area(x, series_dict, title, ytitle, danger_regions=None):
     fig = go.Figure()
-    # stack order: as given in dict
     for name, y in series_dict.items():
         fig.add_trace(go.Scatter(
             x=x, y=y, mode="lines", stackgroup="one", name=name
         ))
 
-    # Danger shading
-    for (x0, x1) in danger_regions:
-        fig.add_vrect(
-            x0=x0, x1=x1,
-            fillcolor="rgba(255,0,0,0.12)",
-            line_width=0,
-            layer="below"
-        )
+    # Danger shading (optional)
+    if danger_regions:
+        for (x0, x1) in danger_regions:
+            fig.add_vrect(
+                x0=x0, x1=x1,
+                fillcolor="rgba(255,0,0,0.12)",
+                line_width=0,
+                layer="below"
+            )
 
     apply_mobile_layout(fig, title, ytitle, y_is_percent=True)
     return fig
@@ -265,6 +264,7 @@ for Tc in T_C:
 danger_regions = find_regions(T_C, flag)
 show_warn = any(flag)
 
+# --- Top: Dry/Wet composition curves ---
 colA, colB = st.columns([1, 1], gap="large")
 
 with colA:
@@ -289,6 +289,7 @@ with colB:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
+# --- Carbon margin curves ---
 st.subheader("Carbon deposition margin (ln(Q) - ln(K); negative = risk)")
 
 fig3 = go.Figure()
@@ -307,11 +308,38 @@ apply_mobile_layout(
     y_is_percent=False
 )
 
-# For margin plot, set a nicer x ticks and a little extra bottom margin
+# For margin plot: keep x ticks clean
 fig3.update_layout(margin=dict(l=60, r=20, t=55, b=85))
 fig3.update_xaxes(tickmode="linear", tick0=400, dtick=100)
 
 st.plotly_chart(fig3, use_container_width=True)
+
+# -----------------------------
+# NEW: After margin -> add two more composition CURVE graphs (fixed 0–100%)
+# -----------------------------
+st.subheader("Gas composition curves (fixed to 100%) — re-shown after carbon margin")
+
+colC, colD = st.columns([1, 1], gap="large")
+
+with colC:
+    fig4 = stacked_area(
+        T_C,
+        {"H2": dry["H2"], "CO": dry["CO"], "CO2": dry["CO2"], "CH4": dry["CH4"]},
+        "Dry gas composition (H2/CO/CO2/CH4, 0–100% fixed)",
+        "Dry composition (%)",
+        danger_regions
+    )
+    st.plotly_chart(fig4, use_container_width=True)
+
+with colD:
+    fig5 = stacked_area(
+        T_C,
+        {"H2O": wet["H2O"], "H2": wet["H2"], "CO": wet["CO"], "CO2": wet["CO2"], "CH4": wet["CH4"]},
+        "Wet gas composition (incl. H2O, 0–100% fixed)",
+        "Wet composition (%)",
+        danger_regions
+    )
+    st.plotly_chart(fig5, use_container_width=True)
 
 if graphite is None:
     st.info("Note: graphite phase file was not found in your Cantera install, so Kp-based carbon warning may be disabled. Try upgrading Cantera or adding graphite.yaml.")
